@@ -1,0 +1,1345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LEVEL UP — Personal Growth System</title>
+  <meta name="description" content="Gamified personal growth dashboard: track habits, daily tasks, fitness workouts, study focus sessions, and daily journals with an XP and leveling system.">
+  <link rel="stylesheet" href="style.css">
+  <!-- Google Fonts Outfit & JetBrains Mono with system sans fallback -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Initial App Session Loader -->
+  <div id="app-initial-loader" class="app-loader-screen">
+    <div class="app-loader-spinner"></div>
+    <div class="app-loader-text">Loading LEVEL UP...</div>
+  </div>
+
+  <!-- Fullscreen Cloud Authentication Screen -->
+  <div id="auth-screen" class="auth-screen hidden">
+    <div class="auth-container">
+      <div class="auth-header">
+        <div class="auth-brand-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
+        </div>
+        <h2 class="auth-title">LEVEL UP</h2>
+        <p class="auth-subtitle">Cloud Sync across your desktop and mobile</p>
+      </div>
+
+      <!-- Config warning if user hasn't set keys -->
+      <div id="auth-config-warning" class="auth-config-warning hidden">
+        <strong>Setup Notice:</strong> Supabase credentials are missing in <code>supabase-config.js</code>. Please enter your Project URL and Publishable Key to connect cloud sync.
+      </div>
+
+      <!-- Auth Alert (Errors / Confirmations) -->
+      <div id="auth-alert" class="auth-alert hidden" role="alert"></div>
+
+      <!-- Tab Toggle (Sign In / Create Account) -->
+      <div class="auth-tabs" id="auth-tabs-bar">
+        <button type="button" class="auth-tab-btn active" id="tab-login" onclick="app.switchAuthMode('login')">Sign In</button>
+        <button type="button" class="auth-tab-btn" id="tab-signup" onclick="app.switchAuthMode('signup')">Create Account</button>
+      </div>
+
+      <!-- Main Auth Form (Sign In & Sign Up) -->
+      <form id="auth-form" onsubmit="event.preventDefault(); app.handleAuthSubmit();">
+        <!-- Name (Signup only) -->
+        <div class="form-group hidden" id="group-signup-name">
+          <label for="auth-display-name" class="form-label">Display Name</label>
+          <input type="text" id="auth-display-name" class="text-input" placeholder="e.g. Alex, Champion" maxlength="30" autocomplete="name">
+        </div>
+
+        <!-- Email -->
+        <div class="form-group">
+          <label for="auth-email" class="form-label">Email Address *</label>
+          <input type="email" id="auth-email" class="text-input" placeholder="you@example.com" required autocomplete="email">
+        </div>
+
+        <!-- Password -->
+        <div class="form-group">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+            <label for="auth-password" class="form-label" style="margin-bottom: 0;">Password *</label>
+            <button type="button" class="text-sm text-lime" id="link-forgot-pass" onclick="app.switchAuthMode('forgot')" style="padding: 0;">Forgot password?</button>
+          </div>
+          <div class="password-input-wrap">
+            <input type="password" id="auth-password" class="text-input" placeholder="••••••••" required minlength="6" autocomplete="current-password">
+            <button type="button" class="btn-toggle-password" onclick="app.togglePasswordVisibility('auth-password')" aria-label="Toggle password visibility">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" class="btn btn-primary auth-submit-btn" id="btn-auth-submit">
+          <span id="btn-auth-text">Sign In to Dashboard</span>
+        </button>
+      </form>
+
+      <!-- Forgot Password Form -->
+      <form id="auth-forgot-form" class="hidden" onsubmit="event.preventDefault(); app.handleForgotSubmit();">
+        <p class="text-secondary text-sm" style="margin-bottom: 1rem;">Enter your email address and we'll send you a secure link to reset your password.</p>
+        <div class="form-group">
+          <label for="auth-forgot-email" class="form-label">Account Email *</label>
+          <input type="email" id="auth-forgot-email" class="text-input" placeholder="you@example.com" required autocomplete="email">
+        </div>
+        <button type="submit" class="btn btn-primary auth-submit-btn" id="btn-forgot-submit">
+          <span>Send Reset Link</span>
+        </button>
+        <button type="button" class="auth-switch-link" onclick="app.switchAuthMode('login')">
+          ← Back to Sign In
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- App Container -->
+  <div class="app-layout" id="app-layout">
+
+    <!-- Sidebar Navigation (Desktop) -->
+    <aside class="sidebar" id="sidebar" aria-label="Main Navigation">
+      <div class="sidebar-header">
+        <div class="brand">
+          <div class="brand-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+          </div>
+          <div class="brand-text">
+            <span class="brand-title">LEVEL UP</span>
+            <span class="brand-subtitle">Growth System</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation Links -->
+      <nav class="nav-menu">
+        <button type="button" class="nav-item active" data-view="dashboard" id="nav-dashboard">
+          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="9"></rect>
+            <rect x="14" y="3" width="7" height="5"></rect>
+            <rect x="14" y="12" width="7" height="9"></rect>
+            <rect x="3" y="16" width="7" height="5"></rect>
+          </svg>
+          <span>Dashboard</span>
+        </button>
+
+        <button type="button" class="nav-item" data-view="habits" id="nav-habits">
+          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
+          </svg>
+          <span>Habit Tracker</span>
+        </button>
+
+        <button type="button" class="nav-item" data-view="tasks" id="nav-tasks">
+          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 11l3 3L22 4"></path>
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+          </svg>
+          <span>Goals & Tasks</span>
+        </button>
+
+        <button type="button" class="nav-item" data-view="fitness" id="nav-fitness">
+          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 5v14M18 5v14M2 9h4M18 9h4M2 15h4M18 15h4M6 12h12"></path>
+          </svg>
+          <span>Fitness</span>
+        </button>
+
+        <button type="button" class="nav-item" data-view="focus" id="nav-focus">
+          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <span>Study & Focus</span>
+        </button>
+
+        <button type="button" class="nav-item" data-view="journal" id="nav-journal">
+          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            <line x1="9" y1="7" x2="15" y2="7"></line>
+            <line x1="9" y1="11" x2="13" y2="11"></line>
+          </svg>
+          <span>Daily Journal</span>
+        </button>
+
+        <button type="button" class="nav-item" data-view="progress" id="nav-progress">
+          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
+            <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
+            <path d="M4 22h16"></path>
+            <path d="M10 14.66V17c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-2.34"></path>
+            <path d="M14 14.66V17c0 .55.45 1 1 1h2c.55 0 1-.45 1-1v-2.34"></path>
+            <path d="M18 2H6v7a6 6 0 0 0 12 0V2z"></path>
+          </svg>
+          <span>Progress & Badges</span>
+        </button>
+
+        <button type="button" class="nav-item" data-view="settings" id="nav-settings">
+          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <span>Settings</span>
+        </button>
+      </nav>
+
+      <!-- Sidebar Footer User Card -->
+      <div class="sidebar-user-card">
+        <div class="user-avatar" id="sidebar-user-avatar">C</div>
+        <div class="user-meta">
+          <div class="user-name" id="sidebar-user-name">Champion</div>
+          <div class="user-email" id="sidebar-user-email">cloud@levelup.app</div>
+          <div class="user-lvl-tag" id="sidebar-user-level">Level 1 Adventurer</div>
+        </div>
+        <button type="button" class="btn-sidebar-logout" id="sidebar-logout-btn" title="Sign Out" onclick="app.signOut()" aria-label="Sign Out">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-wrapper" id="main-content">
+
+      <!-- Header Topbar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button type="button" class="mobile-menu-btn" id="mobile-menu-toggle" aria-label="Toggle navigation menu">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <div class="greeting-box">
+            <h1 class="welcome-heading" id="welcome-heading">Welcome back, Champion!</h1>
+            <div class="current-date-badge" id="current-date-display">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+              <span id="date-text">Loading date...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gamification Status Bar in Header -->
+        <div class="topbar-right">
+          <!-- Level Pill -->
+          <div class="stat-pill level-pill">
+            <span class="pill-badge" id="header-level-badge">LVL 1</span>
+            <div class="level-progress-wrapper">
+              <div class="progress-bar-container">
+                <div class="progress-bar-fill" id="header-xp-bar" style="width: 0%;"></div>
+              </div>
+              <div class="level-details-text">
+                <span id="header-xp-text">0 / 100 XP</span>
+                <span class="xp-needed" id="header-xp-needed">100 XP to Lvl 2</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Total XP Badge -->
+          <div class="stat-pill xp-pill" title="Total Lifetime XP">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+            </svg>
+            <span id="header-total-xp">0 XP</span>
+          </div>
+
+          <!-- Current Streak Pill -->
+          <div class="stat-pill streak-pill" title="Current Daily Streak">
+            <span class="flame-icon">🔥</span>
+            <span id="header-streak-count">0 Days</span>
+          </div>
+
+          <!-- Cloud Sync Status Pill -->
+          <button type="button" class="stat-pill sync-pill" id="header-sync-pill" title="Cloud Sync: Click to sync now" aria-label="Cloud Sync Status" onclick="app.triggerManualSync()">
+            <span class="sync-dot" id="header-sync-dot"></span>
+            <span id="header-sync-text">Cloud Synced</span>
+          </button>
+
+          <!-- Audio FX Toggle -->
+          <button type="button" class="icon-action-btn" id="audio-toggle-btn" title="Toggle Sound FX" aria-label="Toggle Sound Effects">
+            <svg id="audio-icon-on" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            </svg>
+            <svg id="audio-icon-off" class="hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <line x1="23" y1="9" x2="17" y2="15"></line>
+              <line x1="17" y1="9" x2="23" y2="15"></line>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- View Containers -->
+      <div class="content-scrollable">
+
+        <!-- ============================================== -->
+        <!-- VIEW 1: DASHBOARD                              -->
+        <!-- ============================================== -->
+        <section class="view-panel active" id="view-dashboard" aria-labelledby="welcome-heading">
+          <!-- Motivational Banner -->
+          <div class="hero-quote-card">
+            <div class="quote-content">
+              <div class="quote-badge">DAILY MOTIVATION</div>
+              <p class="quote-text" id="quote-text">"You do not rise to the level of your goals. You fall to the level of your systems."</p>
+              <span class="quote-author" id="quote-author">— James Clear, Atomic Habits</span>
+            </div>
+            <button type="button" class="quote-refresh-btn" id="refresh-quote-btn" title="Get another motivational quote" aria-label="Refresh quote">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Dashboard Metric Cards (4 Grid) -->
+          <div class="metric-cards-grid">
+            <!-- Habit Completion -->
+            <div class="metric-card" id="card-metric-habits">
+              <div class="metric-header">
+                <span class="metric-title">Today's Habits</span>
+                <div class="metric-icon-wrap lime">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </div>
+              </div>
+              <div class="metric-value-row">
+                <span class="metric-number" id="dash-habit-pct">0%</span>
+                <span class="metric-sub" id="dash-habit-ratio">0 of 5 done</span>
+              </div>
+              <div class="metric-progress-bar">
+                <div class="metric-progress-fill" id="dash-habit-bar" style="width: 0%;"></div>
+              </div>
+            </div>
+
+            <!-- Daily Task Completion -->
+            <div class="metric-card" id="card-metric-tasks">
+              <div class="metric-header">
+                <span class="metric-title">Daily Tasks</span>
+                <div class="metric-icon-wrap blue">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 11l3 3L22 4"></path>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                  </svg>
+                </div>
+              </div>
+              <div class="metric-value-row">
+                <span class="metric-number" id="dash-task-pct">0%</span>
+                <span class="metric-sub" id="dash-task-ratio">0 of 0 done</span>
+              </div>
+              <div class="metric-progress-bar">
+                <div class="metric-progress-fill blue-fill" id="dash-task-bar" style="width: 0%;"></div>
+              </div>
+            </div>
+
+            <!-- Current & Best Streak -->
+            <div class="metric-card" id="card-metric-streak">
+              <div class="metric-header">
+                <span class="metric-title">Habit Streak</span>
+                <div class="metric-icon-wrap orange">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2c-.5 2-2 4-4 6-2 2-3 4-3 6.5a7 7 0 1 0 14 0c0-2.5-1-4.5-3-6.5-2-2-3.5-4-4-6z"></path>
+                  </svg>
+                </div>
+              </div>
+              <div class="metric-value-row">
+                <span class="metric-number" id="dash-streak-count">0</span>
+                <span class="metric-sub">consecutive days</span>
+              </div>
+              <div class="metric-footer-note">
+                <span>Best Record:</span>
+                <strong id="dash-best-streak" class="text-lime">0 Days</strong>
+              </div>
+            </div>
+
+            <!-- Focus Time Today -->
+            <div class="metric-card" id="card-metric-focus">
+              <div class="metric-header">
+                <span class="metric-title">Focus Time</span>
+                <div class="metric-icon-wrap purple">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                  </svg>
+                </div>
+              </div>
+              <div class="metric-value-row">
+                <span class="metric-number" id="dash-focus-mins">0m</span>
+                <span class="metric-sub">today's deep work</span>
+              </div>
+              <div class="metric-footer-note">
+                <span>This Week:</span>
+                <strong id="dash-focus-week" class="text-white">0 hrs</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Action Shortcuts -->
+          <div class="quick-action-strip">
+            <span class="quick-action-label">Quick Actions:</span>
+            <button type="button" class="quick-btn" onclick="app.navTo('habits')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span>Check Habits</span>
+            </button>
+            <button type="button" class="quick-btn" onclick="app.navTo('focus')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              <span>Start Focus Timer</span>
+            </button>
+            <button type="button" class="quick-btn" onclick="app.openWorkoutModal()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 5v14M18 5v14M2 9h4M18 9h4M2 15h4M18 15h4M6 12h12"></path></svg>
+              <span>Log Workout</span>
+            </button>
+            <button type="button" class="quick-btn" onclick="app.navTo('journal')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+              <span>Daily Journal</span>
+            </button>
+          </div>
+
+          <!-- Dashboard Main Split Columns -->
+          <div class="dash-columns-split">
+            <!-- Left Column: Today's Habits Interactive Checklist -->
+            <div class="dash-panel card">
+              <div class="panel-header">
+                <div>
+                  <h2 class="panel-title">Today's Habits</h2>
+                  <p class="panel-subtitle">Complete daily habits to earn XP & maintain your streak</p>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="app.navTo('habits')">
+                  <span>Manage</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
+              </div>
+              <div class="habits-checklist" id="dash-habits-list">
+                <!-- Dynamically rendered habits -->
+              </div>
+            </div>
+
+            <!-- Right Column: Top 3 Tasks & Recent Achievements -->
+            <div class="dash-side-col">
+              <!-- Top 3 Daily Priorities -->
+              <div class="dash-panel card">
+                <div class="panel-header">
+                  <div>
+                    <div class="tag-accent-top3">DAILY FOCUS</div>
+                    <h2 class="panel-title">Top 3 Priorities</h2>
+                  </div>
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="app.navTo('tasks')">
+                    <span>View All</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                  </button>
+                </div>
+                <div class="top3-tasks-list" id="dash-top3-list">
+                  <!-- Dynamically rendered top 3 tasks -->
+                </div>
+              </div>
+
+              <!-- Recent Achievements Showcase -->
+              <div class="dash-panel card">
+                <div class="panel-header">
+                  <h2 class="panel-title">Achievements</h2>
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="app.navTo('progress')">
+                    <span>View All</span>
+                  </button>
+                </div>
+                <div class="recent-achievements-list" id="dash-recent-badges">
+                  <!-- Dynamically rendered recent badges -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- ============================================== -->
+        <!-- VIEW 2: HABIT TRACKER                          -->
+        <!-- ============================================== -->
+        <section class="view-panel" id="view-habits" aria-labelledby="habits-page-title">
+          <div class="page-header">
+            <div>
+              <h2 class="page-title" id="habits-page-title">Habit Tracker</h2>
+              <p class="page-subtitle">Build consistent positive loops. Habits can be checked once per calendar day.</p>
+            </div>
+            <button type="button" class="btn btn-primary" id="btn-add-habit" onclick="app.openHabitModal()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>Create Habit</span>
+            </button>
+          </div>
+
+          <!-- Habit Category Filter Pills -->
+          <div class="filter-pills-row">
+            <button type="button" class="filter-pill active" data-habit-filter="all" onclick="app.setHabitFilter('all')">All Habits</button>
+            <button type="button" class="filter-pill" data-habit-filter="Study" onclick="app.setHabitFilter('Study')">Study</button>
+            <button type="button" class="filter-pill" data-habit-filter="Fitness" onclick="app.setHabitFilter('Fitness')">Fitness</button>
+            <button type="button" class="filter-pill" data-habit-filter="Growth" onclick="app.setHabitFilter('Growth')">Growth</button>
+            <button type="button" class="filter-pill" data-habit-filter="Discipline" onclick="app.setHabitFilter('Discipline')">Discipline</button>
+            <button type="button" class="filter-pill" data-habit-filter="Mindset" onclick="app.setHabitFilter('Mindset')">Mindset</button>
+          </div>
+
+          <!-- Habits Grid -->
+          <div class="habits-grid" id="habits-full-list">
+            <!-- Dynamically populated habit cards -->
+          </div>
+        </section>
+
+
+        <!-- ============================================== -->
+        <!-- VIEW 3: GOALS & DAILY TASKS                    -->
+        <!-- ============================================== -->
+        <section class="view-panel" id="view-tasks" aria-labelledby="tasks-page-title">
+          <div class="page-header">
+            <div>
+              <h2 class="page-title" id="tasks-page-title">Goals & Daily Tasks</h2>
+              <p class="page-subtitle">Execute high-impact actions. Mark your top three to win the day.</p>
+            </div>
+            <div class="page-header-actions">
+              <button type="button" class="btn btn-secondary" onclick="app.openGoalModal()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
+                <span>Add Goal</span>
+              </button>
+              <button type="button" class="btn btn-primary" onclick="app.openTaskModal()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>New Task</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Top 3 Daily Priorities Spotlight -->
+          <div class="top3-hero-card card">
+            <div class="top3-hero-header">
+              <div class="top3-hero-title-group">
+                <span class="badge-lime">TODAY'S MISSION</span>
+                <h3>The Daily Top 3 Priorities</h3>
+              </div>
+              <p class="text-secondary text-sm">Star up to 3 tasks to spotlight them here and focus your day.</p>
+            </div>
+            <div class="top3-hero-list" id="tasks-top3-spotlight">
+              <!-- Dynamically rendered top 3 list with slots -->
+            </div>
+          </div>
+
+          <!-- Tasks Filter Bar -->
+          <div class="tasks-controls-bar">
+            <div class="filter-pills-row">
+              <button type="button" class="filter-pill active" data-task-filter="all" onclick="app.setTaskFilter('all')">All Tasks</button>
+              <button type="button" class="filter-pill" data-task-filter="active" onclick="app.setTaskFilter('active')">Active</button>
+              <button type="button" class="filter-pill" data-task-filter="top3" onclick="app.setTaskFilter('top3')">Top 3 Only</button>
+              <button type="button" class="filter-pill" data-task-filter="completed" onclick="app.setTaskFilter('completed')">Completed</button>
+            </div>
+            <div class="task-sort-wrap">
+              <label for="task-sort-select" class="sr-only">Sort Tasks</label>
+              <select id="task-sort-select" class="select-input" onchange="app.renderTasks()">
+                <option value="priority">Sort: Priority</option>
+                <option value="deadline">Sort: Deadline</option>
+                <option value="created">Sort: Recently Added</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Tasks List -->
+          <div class="tasks-list-container" id="tasks-full-list">
+            <!-- Dynamically populated task items -->
+          </div>
+
+          <!-- Long-Term Goals Section -->
+          <div class="goals-section">
+            <div class="section-title-row">
+              <div>
+                <h3 class="section-heading">Milestone Goals</h3>
+                <p class="text-secondary text-sm">Long-term vision checkpoints with rewarding XP milestones.</p>
+              </div>
+            </div>
+            <div class="goals-grid" id="goals-full-list">
+              <!-- Dynamically populated goal cards -->
+            </div>
+          </div>
+        </section>
+
+
+        <!-- ============================================== -->
+        <!-- VIEW 4: FITNESS TRACKER                        -->
+        <!-- ============================================== -->
+        <section class="view-panel" id="view-fitness" aria-labelledby="fitness-page-title">
+          <div class="page-header">
+            <div>
+              <h2 class="page-title" id="fitness-page-title">Fitness Tracker</h2>
+              <p class="page-subtitle">Log your training sessions, build physical grit, and track weekly gym volume.</p>
+            </div>
+            <button type="button" class="btn btn-primary" onclick="app.openWorkoutModal()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>Log Workout</span>
+            </button>
+          </div>
+
+          <!-- Weekly Fitness Summary Stats -->
+          <div class="fitness-stats-grid">
+            <div class="stat-card card">
+              <span class="stat-label">Workouts This Week</span>
+              <div class="stat-value-large text-lime" id="fitness-week-count">0</div>
+              <span class="stat-caption" id="fitness-week-target">Target: 4-5 sessions</span>
+            </div>
+            <div class="stat-card card">
+              <span class="stat-label">Total Time This Week</span>
+              <div class="stat-value-large text-white" id="fitness-week-duration">0 min</div>
+              <span class="stat-caption">Dedicated training volume</span>
+            </div>
+            <div class="stat-card card">
+              <span class="stat-label">Lifetime Workouts</span>
+              <div class="stat-value-large text-white" id="fitness-lifetime-count">0</div>
+              <span class="stat-caption" id="fitness-total-xp-earned">0 XP earned from fitness</span>
+            </div>
+          </div>
+
+          <!-- Workout Filter and Log List -->
+          <div class="section-card card">
+            <div class="panel-header">
+              <h3 class="panel-title">Workout History</h3>
+              <div class="filter-pills-row" style="margin: 0;">
+                <button type="button" class="filter-pill active" data-workout-filter="all" onclick="app.setWorkoutFilter('all')">All</button>
+                <button type="button" class="filter-pill" data-workout-filter="Strength" onclick="app.setWorkoutFilter('Strength')">Strength</button>
+                <button type="button" class="filter-pill" data-workout-filter="Cardio" onclick="app.setWorkoutFilter('Cardio')">Cardio</button>
+                <button type="button" class="filter-pill" data-workout-filter="HIIT" onclick="app.setWorkoutFilter('HIIT')">HIIT</button>
+                <button type="button" class="filter-pill" data-workout-filter="Calisthenics" onclick="app.setWorkoutFilter('Calisthenics')">Calisthenics</button>
+                <button type="button" class="filter-pill" data-workout-filter="Yoga" onclick="app.setWorkoutFilter('Yoga')">Yoga</button>
+              </div>
+            </div>
+            <div class="workouts-log-list" id="workouts-log-container">
+              <!-- Dynamically populated workout log cards -->
+            </div>
+          </div>
+        </section>
+
+
+        <!-- ============================================== -->
+        <!-- VIEW 5: STUDY & FOCUS TRACKER                  -->
+        <!-- ============================================== -->
+        <section class="view-panel" id="view-focus" aria-labelledby="focus-page-title">
+          <div class="page-header">
+            <div>
+              <h2 class="page-title" id="focus-page-title">Study & Focus Tracker</h2>
+              <p class="page-subtitle">Enter deep work states with Pomodoro cycles and log intentional study sessions.</p>
+            </div>
+          </div>
+
+          <!-- Pomodoro Timer Hero Card -->
+          <div class="focus-timer-card card">
+            <div class="timer-modes-bar">
+              <button type="button" class="timer-mode-btn active" data-mode="focus" onclick="app.setTimerMode('focus')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                <span>25m Focus</span>
+              </button>
+              <button type="button" class="timer-mode-btn" data-mode="shortBreak" onclick="app.setTimerMode('shortBreak')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>
+                <span>5m Break</span>
+              </button>
+              <button type="button" class="timer-mode-btn" data-mode="longBreak" onclick="app.setTimerMode('longBreak')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                <span>15m Long Break</span>
+              </button>
+              <button type="button" class="timer-mode-btn" data-mode="custom" onclick="app.promptCustomTimer()">
+                <span>Custom</span>
+              </button>
+            </div>
+
+            <!-- Subject Input Selector -->
+            <div class="timer-subject-input-wrap">
+              <label for="timer-subject-input" class="sr-only">Focus Subject</label>
+              <input type="text" id="timer-subject-input" class="timer-subject-field" placeholder="What are you focusing on? (e.g. DSA, JavaScript, System Design)" value="Deep Work">
+            </div>
+
+            <!-- Circular Timer Display -->
+            <div class="circular-timer-wrapper">
+              <svg class="timer-ring-svg" width="260" height="260" viewBox="0 0 260 260">
+                <circle class="timer-ring-bg" cx="130" cy="130" r="115"></circle>
+                <circle class="timer-ring-progress" id="timer-ring-progress" cx="130" cy="130" r="115"></circle>
+              </svg>
+              <div class="timer-center-content">
+                <div class="timer-status-badge" id="timer-status-badge">READY</div>
+                <div class="timer-time-display" id="timer-time-display">25:00</div>
+                <div class="timer-xp-tag" id="timer-xp-indicator">+25 XP on completion</div>
+              </div>
+            </div>
+
+            <!-- Timer Action Controls -->
+            <div class="timer-controls-row">
+              <button type="button" class="btn btn-secondary btn-lg" id="btn-timer-reset" onclick="app.resetTimer()" title="Reset Timer">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 2v6h6"></path><path d="M21 12A9 9 0 0 0 6 5.3L3 8"></path></svg>
+                <span>Reset</span>
+              </button>
+              <button type="button" class="btn btn-primary btn-lg timer-play-btn" id="btn-timer-toggle" onclick="app.toggleTimer()">
+                <svg id="timer-play-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                <svg id="timer-pause-icon" class="hidden" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                <span id="timer-toggle-label">Start Focus</span>
+              </button>
+              <button type="button" class="btn btn-secondary btn-lg" id="btn-timer-skip" onclick="app.manualLogSessionModal()" title="Manually Log a Completed Session">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                <span>Log Session</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Focus Stats & Log Split -->
+          <div class="focus-bottom-split">
+            <!-- Focus Statistics Card -->
+            <div class="dash-panel card">
+              <div class="panel-header">
+                <h3 class="panel-title">Focus Analytics</h3>
+              </div>
+              <div class="focus-metrics-list">
+                <div class="focus-metric-item">
+                  <span class="text-secondary">Today's Focus Time:</span>
+                  <strong class="text-lime text-lg" id="focus-stat-today">0 mins</strong>
+                </div>
+                <div class="focus-metric-item">
+                  <span class="text-secondary">This Week:</span>
+                  <strong class="text-white text-lg" id="focus-stat-week">0 mins</strong>
+                </div>
+                <div class="focus-metric-item">
+                  <span class="text-secondary">Total Sessions Completed:</span>
+                  <strong class="text-white text-lg" id="focus-stat-count">0</strong>
+                </div>
+                <div class="focus-metric-item">
+                  <span class="text-secondary">Lifetime Focus XP:</span>
+                  <strong class="text-lime text-lg" id="focus-stat-xp">0 XP</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- Focus Session Log Card -->
+            <div class="dash-panel card">
+              <div class="panel-header">
+                <h3 class="panel-title">Completed Sessions</h3>
+                <span class="text-secondary text-sm" id="focus-log-count-label">0 logged</span>
+              </div>
+              <div class="focus-sessions-list" id="focus-sessions-container">
+                <!-- Dynamically populated completed sessions -->
+              </div>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- ============================================== -->
+        <!-- VIEW 6: DAILY JOURNAL                          -->
+        <!-- ============================================== -->
+        <section class="view-panel" id="view-journal" aria-labelledby="journal-page-title">
+          <div class="page-header">
+            <div>
+              <h2 class="page-title" id="journal-page-title">Daily Journal</h2>
+              <p class="page-subtitle">Reflect intentionally, recognize your wins, and blueprint tomorrow.</p>
+            </div>
+            <!-- Journal Date Picker Controls -->
+            <div class="journal-date-selector-wrap">
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-journal-prev" onclick="app.changeJournalDate(-1)" title="Previous Day">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              </button>
+              <input type="date" id="journal-date-input" class="date-input-field" onchange="app.loadJournalForDate(this.value)">
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-journal-next" onclick="app.changeJournalDate(1)" title="Next Day">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="app.loadJournalForDate(app.getTodayStr())" title="Go to Today">Today</button>
+            </div>
+          </div>
+
+          <!-- Journal Form Card -->
+          <div class="journal-form-card card">
+            <div class="journal-form-header">
+              <div class="journal-badge-row">
+                <span class="badge-lime" id="journal-current-date-badge">Sunday, Oct 11, 2026</span>
+                <span class="journal-xp-tag">+15 XP for Daily Entry</span>
+              </div>
+              <div class="journal-status-indicator" id="journal-status-text">Draft ready</div>
+            </div>
+
+            <form id="journal-form" onsubmit="event.preventDefault(); app.saveJournalEntry();">
+              <!-- Field 1: What went well? -->
+              <div class="journal-field-group">
+                <label for="journal-well" class="journal-label">
+                  <span class="journal-prompt-icon">✨</span>
+                  <span>1. What went well today?</span>
+                </label>
+                <textarea id="journal-well" class="journal-textarea" rows="3" placeholder="Wins, small victories, moments of focus, or positive breakthroughs..."></textarea>
+              </div>
+
+              <!-- Field 2: What could I improve? -->
+              <div class="journal-field-group">
+                <label for="journal-improve" class="journal-label">
+                  <span class="journal-prompt-icon">🔍</span>
+                  <span>2. What could I improve?</span>
+                </label>
+                <textarea id="journal-improve" class="journal-textarea" rows="3" placeholder="Distractions encountered, energy dips, boundaries to tighten..."></textarea>
+              </div>
+
+              <!-- Field 3: What did I learn? -->
+              <div class="journal-field-group">
+                <label for="journal-learned" class="journal-label">
+                  <span class="journal-prompt-icon">💡</span>
+                  <span>3. What did I learn?</span>
+                </label>
+                <textarea id="journal-learned" class="journal-textarea" rows="3" placeholder="New insights, coding techniques, personal discoveries, or ideas..."></textarea>
+              </div>
+
+              <!-- Field 4: Tomorrow's Priorities -->
+              <div class="journal-field-group">
+                <label for="journal-priorities" class="journal-label">
+                  <span class="journal-prompt-icon">🎯</span>
+                  <span>4. What are tomorrow's priorities?</span>
+                </label>
+                <textarea id="journal-priorities" class="journal-textarea" rows="3" placeholder="The top 1-3 critical objectives you will tackle tomorrow..."></textarea>
+              </div>
+
+              <div class="journal-actions-row">
+                <button type="submit" class="btn btn-primary btn-lg" id="btn-save-journal">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                  <span>Save Journal Entry</span>
+                </button>
+                <span class="text-secondary text-sm" id="journal-save-feedback"></span>
+              </div>
+            </form>
+          </div>
+
+          <!-- Past Journal Archive -->
+          <div class="section-card card">
+            <div class="panel-header">
+              <h3 class="panel-title">Past Entries Archive</h3>
+              <span class="text-secondary text-sm" id="journal-total-count">0 entries recorded</span>
+            </div>
+            <div class="journal-history-list" id="journal-history-container">
+              <!-- Dynamically populated past entries -->
+            </div>
+          </div>
+        </section>
+
+
+        <!-- ============================================== -->
+        <!-- VIEW 7: PROGRESS & ACHIEVEMENTS                -->
+        <!-- ============================================== -->
+        <section class="view-panel" id="view-progress" aria-labelledby="progress-page-title">
+          <div class="page-header">
+            <div>
+              <h2 class="page-title" id="progress-page-title">Progress & Achievements</h2>
+              <p class="page-subtitle">Analyze your weekly consistency, unlock badges, and level up your character.</p>
+            </div>
+          </div>
+
+          <!-- Progress Overview Numbers -->
+          <div class="progress-stats-row">
+            <div class="stat-card card">
+              <span class="stat-label">Current Level</span>
+              <div class="stat-value-large text-lime" id="prog-level-val">1</div>
+              <span class="stat-caption" id="prog-level-title">Novice Adventurer</span>
+            </div>
+            <div class="stat-card card">
+              <span class="stat-label">Lifetime XP</span>
+              <div class="stat-value-large text-white" id="prog-xp-val">0 XP</div>
+              <span class="stat-caption" id="prog-xp-needed-sub">100 XP to next level</span>
+            </div>
+            <div class="stat-card card">
+              <span class="stat-label">Active Habit Streak</span>
+              <div class="stat-value-large text-lime" id="prog-streak-val">0 Days</div>
+              <span class="stat-caption" id="prog-best-streak-sub">All-time best: 0 days</span>
+            </div>
+            <div class="stat-card card">
+              <span class="stat-label">Achievements Unlocked</span>
+              <div class="stat-value-large text-white" id="prog-badge-count">0 / 10</div>
+              <span class="stat-caption" id="prog-badge-pct">0% completed</span>
+            </div>
+          </div>
+
+          <!-- 7-Day Visual Activity Chart (Custom Native SVG Bar Chart) -->
+          <div class="chart-card card">
+            <div class="chart-header">
+              <div>
+                <h3 class="panel-title">Weekly Habit & Focus Activity</h3>
+                <p class="text-secondary text-sm">Last 7 days of daily habits completed and deep work focus minutes</p>
+              </div>
+              <div class="chart-legend">
+                <div class="legend-item">
+                  <span class="legend-color-dot lime-dot"></span>
+                  <span>Habits Done</span>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-color-dot purple-dot"></span>
+                  <span>Focus (mins)</span>
+                </div>
+              </div>
+            </div>
+            <!-- Responsive SVG Container -->
+            <div class="chart-canvas-wrap" id="activity-chart-wrapper">
+              <!-- Dynamically generated SVG chart -->
+            </div>
+          </div>
+
+          <!-- Achievements Section -->
+          <div class="achievements-section">
+            <div class="section-title-row">
+              <div>
+                <h3 class="section-heading">Achievements & Badges</h3>
+                <p class="text-secondary text-sm">Complete challenges to permanently unlock trophies and boost motivation.</p>
+              </div>
+              <div class="filter-pills-row" style="margin: 0;">
+                <button type="button" class="filter-pill active" data-badge-filter="all" onclick="app.setBadgeFilter('all')">All Badges</button>
+                <button type="button" class="filter-pill" data-badge-filter="unlocked" onclick="app.setBadgeFilter('unlocked')">Unlocked</button>
+                <button type="button" class="filter-pill" data-badge-filter="locked" onclick="app.setBadgeFilter('locked')">Locked</button>
+              </div>
+            </div>
+            <div class="achievements-grid" id="achievements-container">
+              <!-- Dynamically populated achievements -->
+            </div>
+          </div>
+        </section>
+
+
+        <!-- ============================================== -->
+        <!-- VIEW 8: SETTINGS & DATA MANAGEMENT             -->
+        <!-- ============================================== -->
+        <section class="view-panel" id="view-settings" aria-labelledby="settings-page-title">
+          <div class="page-header">
+            <div>
+              <h2 class="page-title" id="settings-page-title">Settings & Data Management</h2>
+              <p class="page-subtitle">Configure your preferences and securely backup or restore your local growth data.</p>
+            </div>
+          </div>
+
+          <div class="settings-grid">
+            <!-- Cloud Account & Synchronization Settings -->
+            <div class="settings-card card">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                <h3 class="settings-card-title" style="margin-bottom: 0;">Cloud Account & Synchronization</h3>
+                <span class="badge-lime" id="settings-sync-badge">CONNECTED</span>
+              </div>
+              <p class="text-secondary text-sm">Your growth data is synchronized with Supabase PostgreSQL cloud storage with Row Level Security (RLS).</p>
+              
+              <div style="margin: 1rem 0; padding: 0.85rem; background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.35rem; font-size: 0.85rem;">
+                  <span class="text-secondary">Logged in as:</span>
+                  <strong class="text-white" id="settings-account-email">—</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.85rem;">
+                  <span class="text-secondary">Sync Status:</span>
+                  <span id="settings-sync-status-text" class="text-lime font-medium">Synced</span>
+                </div>
+              </div>
+
+              <div class="backup-actions-row">
+                <button type="button" class="btn btn-secondary" onclick="app.triggerManualSync()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                  <span>Sync Cloud Data Now</span>
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="app.openMigrationModal()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                  <span>Migrate Local Data to Cloud</span>
+                </button>
+                <button type="button" class="btn btn-danger" onclick="app.signOut()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Profile Settings -->
+            <div class="settings-card card">
+              <h3 class="settings-card-title">Profile Configuration</h3>
+              <div class="form-group">
+                <label for="settings-user-name" class="form-label">Display Name</label>
+                <input type="text" id="settings-user-name" class="text-input" placeholder="e.g. Champion, Alex, Sarah" maxlength="24">
+                <span class="form-help">Displayed in the header greeting and profile card.</span>
+              </div>
+              <button type="button" class="btn btn-primary" onclick="app.saveProfileSettings()">
+                <span>Save Profile</span>
+              </button>
+            </div>
+
+            <!-- Audio & Feedback Preferences -->
+            <div class="settings-card card">
+              <h3 class="settings-card-title">Audio & Feedback</h3>
+              <div class="toggle-setting-row">
+                <div>
+                  <div class="toggle-label-text">Sound Effects (Web Audio API)</div>
+                  <div class="toggle-help-text">Play synthesized reward chimes on completing habits, timer ending, and leveling up.</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="settings-sound-toggle" onchange="app.toggleSoundPreference(this.checked)">
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Data Backup & Restore -->
+            <div class="settings-card card">
+              <h3 class="settings-card-title">Backup & Restore</h3>
+              <p class="text-secondary text-sm">All your data is saved in your browser's localStorage. Export a JSON backup to keep your records safe or transfer between browsers.</p>
+              
+              <div class="backup-actions-row">
+                <button type="button" class="btn btn-secondary" onclick="app.exportDataJSON()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  <span>Export JSON Backup</span>
+                </button>
+
+                <label class="btn btn-secondary btn-file-upload">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                  <span>Import JSON Backup</span>
+                  <input type="file" id="import-file-input" accept=".json,application/json" onchange="app.importDataJSON(event)" style="display: none;">
+                </label>
+              </div>
+            </div>
+
+            <!-- Danger Zone -->
+            <div class="settings-card card danger-card">
+              <h3 class="settings-card-title text-danger">Reset All Data</h3>
+              <p class="text-secondary text-sm">Resetting will clear all habits, tasks, workouts, focus logs, and journals back to initial defaults. This action cannot be undone.</p>
+              <button type="button" class="btn btn-danger" onclick="app.openResetConfirmModal()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                <span>Reset to Default State</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+      </div> <!-- /content-scrollable -->
+
+    </main>
+
+    <!-- Mobile Bottom Navigation Bar -->
+    <nav class="mobile-bottom-nav" aria-label="Mobile Navigation">
+      <button type="button" class="mob-nav-item active" data-view="dashboard" onclick="app.navTo('dashboard')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+        <span>Home</span>
+      </button>
+      <button type="button" class="mob-nav-item" data-view="habits" onclick="app.navTo('habits')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        <span>Habits</span>
+      </button>
+      <button type="button" class="mob-nav-item" data-view="tasks" onclick="app.navTo('tasks')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+        <span>Tasks</span>
+      </button>
+      <button type="button" class="mob-nav-item" data-view="focus" onclick="app.navTo('focus')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        <span>Focus</span>
+      </button>
+      <button type="button" class="mob-nav-item" data-view="settings" onclick="app.navTo('settings')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        <span>More</span>
+      </button>
+    </nav>
+
+  </div> <!-- /app-layout -->
+
+
+  <!-- ============================================== -->
+  <!-- MODALS CONTAINER                               -->
+  <!-- ============================================== -->
+
+  <!-- 1. Habit Modal (Create / Edit) -->
+  <dialog class="app-dialog" id="modal-habit" aria-labelledby="modal-habit-title">
+    <div class="dialog-content">
+      <div class="dialog-header">
+        <h3 class="dialog-title" id="modal-habit-title">Create New Habit</h3>
+        <button type="button" class="dialog-close-btn" onclick="app.closeModal('modal-habit')" aria-label="Close dialog">✕</button>
+      </div>
+      <form id="form-habit" onsubmit="event.preventDefault(); app.saveHabitFromModal();">
+        <input type="hidden" id="habit-modal-id" value="">
+        <div class="form-group">
+          <label for="habit-name" class="form-label">Habit Name *</label>
+          <input type="text" id="habit-name" class="text-input" placeholder="e.g. Study DSA, Morning Workout, Read 10 Pages" required maxlength="40">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="habit-category" class="form-label">Category *</label>
+            <select id="habit-category" class="select-input" required>
+              <option value="Study">Study</option>
+              <option value="Fitness">Fitness</option>
+              <option value="Growth">Growth</option>
+              <option value="Discipline">Discipline</option>
+              <option value="Mindset">Mindset</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="habit-xp" class="form-label">XP Reward *</label>
+            <input type="number" id="habit-xp" class="text-input" min="5" max="100" step="5" value="25" required>
+            <span class="form-help">Recommended: 15 - 35 XP</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="habit-desc" class="form-label">Optional Description</label>
+          <textarea id="habit-desc" class="textarea-input" rows="2" placeholder="Why is this habit important to you? What's the minimum trigger?"></textarea>
+        </div>
+        <div class="dialog-actions">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal('modal-habit')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-habit-modal">Save Habit</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- 2. Task Modal (Create / Edit) -->
+  <dialog class="app-dialog" id="modal-task" aria-labelledby="modal-task-title">
+    <div class="dialog-content">
+      <div class="dialog-header">
+        <h3 class="dialog-title" id="modal-task-title">Add New Task</h3>
+        <button type="button" class="dialog-close-btn" onclick="app.closeModal('modal-task')" aria-label="Close dialog">✕</button>
+      </div>
+      <form id="form-task" onsubmit="event.preventDefault(); app.saveTaskFromModal();">
+        <input type="hidden" id="task-modal-id" value="">
+        <div class="form-group">
+          <label for="task-title" class="form-label">Task Title *</label>
+          <input type="text" id="task-title" class="text-input" placeholder="e.g. Finish LeetCode dynamic programming problem" required maxlength="80">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="task-priority" class="form-label">Priority</label>
+            <select id="task-priority" class="select-input">
+              <option value="High">High Priority</option>
+              <option value="Medium" selected>Medium Priority</option>
+              <option value="Low">Low Priority</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="task-deadline" class="form-label">Deadline</label>
+            <input type="date" id="task-deadline" class="date-input-field">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="task-is-top3">
+            <span class="checkbox-custom"></span>
+            <span class="text-white font-medium">Mark as Daily Top 3 Priority</span>
+          </label>
+          <span class="form-help">Highlights this task directly on your Dashboard and Top 3 spotlight.</span>
+        </div>
+        <div class="dialog-actions">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal('modal-task')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-task-modal">Save Task</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- 3. Goal Modal (Create / Edit) -->
+  <dialog class="app-dialog" id="modal-goal" aria-labelledby="modal-goal-title">
+    <div class="dialog-content">
+      <div class="dialog-header">
+        <h3 class="dialog-title" id="modal-goal-title">Add Long-Term Goal</h3>
+        <button type="button" class="dialog-close-btn" onclick="app.closeModal('modal-goal')" aria-label="Close dialog">✕</button>
+      </div>
+      <form id="form-goal" onsubmit="event.preventDefault(); app.saveGoalFromModal();">
+        <input type="hidden" id="goal-modal-id" value="">
+        <div class="form-group">
+          <label for="goal-title" class="form-label">Goal Title *</label>
+          <input type="text" id="goal-title" class="text-input" placeholder="e.g. Master Frontend Fundamentals & Land Internship" required maxlength="90">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="goal-category" class="form-label">Category</label>
+            <input type="text" id="goal-category" class="text-input" placeholder="e.g. Career, Health, Learning" value="Career">
+          </div>
+          <div class="form-group">
+            <label for="goal-deadline" class="form-label">Target Completion Date</label>
+            <input type="date" id="goal-deadline" class="date-input-field">
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal('modal-goal')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-goal-modal">Save Goal (+100 XP)</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- 4. Workout Modal (Create / Edit) -->
+  <dialog class="app-dialog" id="modal-workout" aria-labelledby="modal-workout-title">
+    <div class="dialog-content">
+      <div class="dialog-header">
+        <h3 class="dialog-title" id="modal-workout-title">Log Workout</h3>
+        <button type="button" class="dialog-close-btn" onclick="app.closeModal('modal-workout')" aria-label="Close dialog">✕</button>
+      </div>
+      <form id="form-workout" onsubmit="event.preventDefault(); app.saveWorkoutFromModal();">
+        <input type="hidden" id="workout-modal-id" value="">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="workout-type" class="form-label">Workout Type *</label>
+            <select id="workout-type" class="select-input" required>
+              <option value="Strength">Strength / Gym</option>
+              <option value="Cardio">Cardio / Running</option>
+              <option value="HIIT">HIIT / Conditioning</option>
+              <option value="Calisthenics">Calisthenics</option>
+              <option value="Yoga">Yoga / Mobility</option>
+              <option value="Other">Other Sport</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="workout-duration" class="form-label">Duration (Minutes) *</label>
+            <input type="number" id="workout-duration" class="text-input" min="5" max="300" step="5" value="45" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="workout-date" class="form-label">Date *</label>
+          <input type="date" id="workout-date" class="date-input-field" required>
+        </div>
+        <div class="form-group">
+          <label for="workout-notes" class="form-label">Notes (Exercises, Weights, Sets)</label>
+          <textarea id="workout-notes" class="textarea-input" rows="3" placeholder="e.g. Bench press 4x8 @ 70kg, Incline dumbbell 3x10, Tricep pushdowns..."></textarea>
+        </div>
+        <div class="dialog-actions">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal('modal-workout')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-workout-modal">Save Workout</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- 5. Focus Session Log Modal -->
+  <dialog class="app-dialog" id="modal-focus-log" aria-labelledby="modal-focus-title">
+    <div class="dialog-content">
+      <div class="dialog-header">
+        <h3 class="dialog-title" id="modal-focus-title">Log Completed Focus Session</h3>
+        <button type="button" class="dialog-close-btn" onclick="app.closeModal('modal-focus-log')" aria-label="Close dialog">✕</button>
+      </div>
+      <form id="form-focus-log" onsubmit="event.preventDefault(); app.saveFocusSessionFromModal();">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="focus-log-subject" class="form-label">Subject / Topic *</label>
+            <input type="text" id="focus-log-subject" class="text-input" placeholder="e.g. JavaScript, Algorithms, System Design" required maxlength="40">
+          </div>
+          <div class="form-group">
+            <label for="focus-log-duration" class="form-label">Duration (Minutes) *</label>
+            <input type="number" id="focus-log-duration" class="text-input" min="5" max="180" step="5" value="25" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="focus-log-notes" class="form-label">Notes</label>
+          <textarea id="focus-log-notes" class="textarea-input" rows="2" placeholder="Key topic studied or progress made..."></textarea>
+        </div>
+        <div class="dialog-actions">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal('modal-focus-log')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Session (+25 XP)</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- 6. Level Up Celebration Modal -->
+  <dialog class="app-dialog modal-levelup" id="modal-levelup" aria-labelledby="levelup-title">
+    <div class="dialog-content text-center">
+      <div class="levelup-crown-anim">👑</div>
+      <span class="badge-lime">LEVEL REACHED!</span>
+      <h2 class="levelup-title" id="levelup-title">LEVEL 2 UNLOCKED</h2>
+      <p class="levelup-subtitle" id="levelup-subtitle">Outstanding dedication! You've advanced to the next rank.</p>
+      <div class="levelup-reward-box">
+        <span class="text-secondary text-sm">Reward Unlocked:</span>
+        <strong class="text-lime" id="levelup-reward-text">+100 Max Energy & New Growth Title</strong>
+      </div>
+      <button type="button" class="btn btn-primary btn-lg" onclick="app.closeModal('modal-levelup')">
+        <span>Keep Crushing It!</span>
+      </button>
+    </div>
+  </dialog>
+
+  <!-- 7. Confirm Delete Modal -->
+  <dialog class="app-dialog modal-confirm" id="modal-confirm-delete" aria-labelledby="confirm-delete-title">
+    <div class="dialog-content">
+      <div class="dialog-header">
+        <h3 class="dialog-title text-danger" id="confirm-delete-title">Confirm Deletion</h3>
+        <button type="button" class="dialog-close-btn" onclick="app.closeModal('modal-confirm-delete')" aria-label="Close dialog">✕</button>
+      </div>
+      <p class="text-secondary" id="confirm-delete-msg">Are you sure you want to delete this item? This action cannot be undone.</p>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-secondary" onclick="app.closeModal('modal-confirm-delete')">Cancel</button>
+        <button type="button" class="btn btn-danger" id="btn-execute-delete">Delete Permanently</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- 8. Confirm Reset Modal -->
+  <dialog class="app-dialog modal-confirm" id="modal-confirm-reset" aria-labelledby="confirm-reset-title">
+    <div class="dialog-content">
+      <div class="dialog-header">
+        <h3 class="dialog-title text-danger" id="confirm-reset-title">Reset All Growth Data?</h3>
+        <button type="button" class="dialog-close-btn" onclick="app.closeModal('modal-confirm-reset')" aria-label="Close dialog">✕</button>
+      </div>
+      <p class="text-secondary">This will completely erase all your custom habits, logged workouts, focus sessions, tasks, and journals. The app will return to the fresh initial starter state.</p>
+      <div class="form-group" style="margin-top: 1rem;">
+        <label for="reset-confirm-input" class="form-label">Type <strong class="text-danger">RESET</strong> below to confirm:</label>
+        <input type="text" id="reset-confirm-input" class="text-input" placeholder="RESET">
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-secondary" onclick="app.closeModal('modal-confirm-reset')">Cancel</button>
+        <button type="button" class="btn btn-danger" id="btn-execute-reset" onclick="app.executeResetAllData()">Reset Everything</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- 9. Migrate Local Data Confirmation Modal -->
+  <dialog class="app-dialog modal-confirm" id="modal-migrate-local-data" aria-labelledby="migrate-modal-title">
+    <div class="dialog-content">
+      <div class="dialog-header">
+        <h3 class="dialog-title text-lime" id="migrate-modal-title">Migrate Local Growth Data to Cloud?</h3>
+        <button type="button" class="dialog-close-btn" onclick="app.closeModal('modal-migrate-local-data')" aria-label="Close dialog">✕</button>
+      </div>
+      <p class="text-secondary" id="migrate-modal-desc">
+        We found existing growth records saved in this browser. Would you like to migrate this data to your Supabase cloud account so you can access it seamlessly on your phone and desktop?
+      </p>
+      <div class="dialog-actions" style="margin-top: 1.25rem;">
+        <button type="button" class="btn btn-secondary" onclick="app.declineLocalDataMigration()">No, Keep Cloud Data</button>
+        <button type="button" class="btn btn-primary" id="btn-confirm-migrate" onclick="app.executeLocalDataMigration()">
+          <span>Yes, Migrate to Cloud</span>
+        </button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- 10. Update Password Modal (From Recovery Link) -->
+  <dialog class="app-dialog" id="modal-update-password" aria-labelledby="update-pass-title">
+    <div class="dialog-content">
+      <div class="dialog-header">
+        <h3 class="dialog-title" id="update-pass-title">Set New Password</h3>
+        <button type="button" class="dialog-close-btn" onclick="app.closeModal('modal-update-password')" aria-label="Close dialog">✕</button>
+      </div>
+      <form id="form-update-password" onsubmit="event.preventDefault(); app.handleUpdatePasswordSubmit();">
+        <p class="text-secondary text-sm" style="margin-bottom: 1rem;">Enter your new password below to secure your account.</p>
+        <div class="form-group">
+          <label for="recovery-new-password" class="form-label">New Password *</label>
+          <div class="password-input-wrap">
+            <input type="password" id="recovery-new-password" class="text-input" placeholder="••••••••" required minlength="6" autocomplete="new-password">
+            <button type="button" class="btn-toggle-password" onclick="app.togglePasswordVisibility('recovery-new-password')" aria-label="Toggle password visibility">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            </button>
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal('modal-update-password')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-new-password">Update Password</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- Supabase JS Client v2 (Official CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Supabase Client Configuration -->
+  <script src="supabase-config.js"></script>
+  <!-- Cloud Synchronization Engine -->
+  <script src="cloud-sync.js"></script>
+  <!-- Main Application Script -->
+  <script src="script.js"></script>
+</body>
+</html>
